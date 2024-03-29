@@ -1,4 +1,5 @@
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Tuple
+import torch, time
 
 from tqdm import tqdm
 from transformers import PreTrainedTokenizer, PreTrainedTokenizerFast
@@ -127,7 +128,8 @@ class LLM:
         prefix_pos: Optional[Union[int, List[int]]] = None,
         use_tqdm: bool = True,
         lora_request: Optional[LoRARequest] = None,
-    ) -> List[RequestOutput]:
+        timing: bool = False
+    ) -> Union[List[RequestOutput], Tuple[List[RequestOutput], float, List[float]]]:
         """Generates the completions for the input prompts.
 
         NOTE: This class automatically batches the given prompts, considering
@@ -179,7 +181,7 @@ class LLM:
                               token_ids,
                               lora_request=lora_request,
                               prefix_pos=prefix_pos_i)
-        return self._run_engine(use_tqdm)
+        return self._run_engine(use_tqdm, timing=timing)
 
     def _add_request(
         self,
@@ -197,15 +199,28 @@ class LLM:
                                     lora_request=lora_request,
                                     prefix_pos=prefix_pos)
 
-    def _run_engine(self, use_tqdm: bool) -> List[RequestOutput]:
+    def _run_engine(self, use_tqdm: bool, timing: bool = False) -> Union[List[RequestOutput], Tuple[List[RequestOutput], float, List[float]]]:
         # Initialize tqdm.
         if use_tqdm:
             num_requests = self.llm_engine.get_num_unfinished_requests()
             pbar = tqdm(total=num_requests, desc="Processed prompts")
         # Run the engine.
         outputs: List[RequestOutput] = []
+        prefill_time_usage = None
+        decoding_time_usages = []
         while self.llm_engine.has_unfinished_requests():
+            if timing:
+                torch.cuda.synchronize()
+                start_time = time.time()
             step_outputs = self.llm_engine.step()
+            if timing:
+                torch.cuda.synchronize()
+                end_time = time.time()
+                step_time = (end_time - start_time)*1000
+                if prefill_time_usage is None:
+                    prefill_time_usage = step_time
+                else:
+                    decoding_time_usages.append(step_time)
             for output in step_outputs:
                 if output.finished:
                     outputs.append(output)
@@ -217,4 +232,6 @@ class LLM:
         # This is necessary because some requests may be finished earlier than
         # its previous requests.
         outputs = sorted(outputs, key=lambda x: int(x.request_id))
+        if timing:
+            return outputs, prefill_time_usage, decoding_time_usages
         return outputs
