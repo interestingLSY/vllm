@@ -72,6 +72,7 @@ class Worker:
         # Related issue:
         # https://discuss.pytorch.org/t/cuda-allocation-lifetime-for-inputs-to-distributed-all-reduce/191573
         os.environ["TORCH_NCCL_AVOID_RECORD_STREAMS"] = "1"
+        torch.set_num_threads(16)   # Speed up weight loading
 
         # This env var set by Ray causes exceptions with graph building.
         os.environ.pop("NCCL_ASYNC_ERROR_HANDLING", None)
@@ -84,7 +85,10 @@ class Worker:
         init_distributed_environment(self.parallel_config, self.rank,
                                      self.distributed_init_method)
         if not self.parallel_config.disable_custom_all_reduce:
+            print("Initializing custom AllReduce...")
             init_custom_ar()
+        else:
+            print("Using built-in AllReduce...")
         # Initialize the model.
         set_random_seed(self.model_config.seed)
 
