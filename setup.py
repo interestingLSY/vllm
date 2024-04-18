@@ -15,7 +15,7 @@ ROOT_DIR = os.path.dirname(__file__)
 MAIN_CUDA_VERSION = "12.1"
 
 # Supported NVIDIA GPU architectures.
-SUPPORTED_ARCHS = {"7.0", "7.5", "8.0", "8.6", "8.9", "9.0"}
+SUPPORTED_ARCHS = {"8.0", "8.6", "8.9", "9.0"}
 
 # Compiler flags.
 CXX_FLAGS = ["-g", "-O2", "-std=c++17"]
@@ -138,7 +138,7 @@ for capability in compute_capabilities:
 
 # Use NVCC threads to parallelize the build.
 if nvcc_cuda_version >= Version("11.2"):
-    num_threads = min(os.cpu_count(), 8)
+    num_threads = min(os.cpu_count(), 4)
     NVCC_FLAGS += ["--threads", str(num_threads)]
 
 ext_modules = []
