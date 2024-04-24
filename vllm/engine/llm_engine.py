@@ -371,6 +371,7 @@ class LLMEngine:
         prompt_logprobs = outputs.prompt_logprobs
         if prompt_logprobs is not None:
             seq_group.prompt_logprobs = prompt_logprobs
+        seq_group.timestamps.append(time.perf_counter())
 
         # Process samples
         samples = outputs.samples
