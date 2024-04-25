@@ -13,7 +13,7 @@ from torch.utils.cpp_extension import BuildExtension, CUDAExtension, CUDA_HOME
 ROOT_DIR = os.path.dirname(__file__)
 
 # Supported NVIDIA GPU architectures.
-SUPPORTED_ARCHS = ["7.0", "7.5", "8.0", "8.6", "8.9", "9.0"]
+SUPPORTED_ARCHS = ["8.0", "8.6", "8.9", "9.0"]
 
 # Compiler flags.
 CXX_FLAGS = ["-g", "-O2", "-std=c++17"]
