@@ -357,6 +357,7 @@ class LLMEngine:
             parent_child_dict[sample.parent_seq_id].append(sample)
         # List of (child, parent)
         child_seqs: List[Tuple[Sequence, Sequence]] = []
+        seq_group.timestamps.append(time.perf_counter())
 
         # Process the child samples for each parent sequence
         for parent in parent_seqs:
