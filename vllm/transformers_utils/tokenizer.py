@@ -127,19 +127,24 @@ def detokenize_incrementally(
     # The prefix text is necessary only to defeat cleanup algorithms in
     # the decode which decide to add a space or not depending on the
     # surrounding ids.
+    # NOTE(intlsy): Sometimes the `output_tokens` contains `None`, which leads
+    # to detokenization errors. This is a temporary workaround to replace
+    # `None` with "None" (a string contains "None").
+    def replace_none(arr: list[str]) -> list[str]:
+        return [token if token is not None else "None" for token in arr]
     if not getattr(tokenizer, "added_tokens_encoder", {}):
         prefix_text = tokenizer.convert_tokens_to_string(
-            output_tokens[prefix_offset:read_offset])
+            replace_none(output_tokens[prefix_offset:read_offset]))
         new_text = tokenizer.convert_tokens_to_string(
-            output_tokens[prefix_offset:])
+            replace_none(output_tokens[prefix_offset:]))
     else:
         prefix_text = _convert_tokens_to_string_with_added_encoders(
             tokenizer,
-            output_tokens[prefix_offset:read_offset],
+            replace_none(output_tokens[prefix_offset:read_offset]),
             skip_special_tokens=skip_special_tokens)
         new_text = _convert_tokens_to_string_with_added_encoders(
             tokenizer,
-            output_tokens[prefix_offset:],
+            replace_none(output_tokens[prefix_offset:]),
             skip_special_tokens=skip_special_tokens)
 
     if len(new_text) > len(prefix_text) and not new_text.endswith("�"):
