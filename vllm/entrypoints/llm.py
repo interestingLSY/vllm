@@ -1,4 +1,5 @@
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Tuple
+import torch, time
 
 import torch
 from tqdm import tqdm
@@ -143,7 +144,8 @@ class LLM:
         use_tqdm: bool = True,
         lora_request: Optional[LoRARequest] = None,
         multi_modal_data: Optional[MultiModalData] = None,
-    ) -> List[RequestOutput]:
+        timing: bool = False,
+    ) -> Union[List[RequestOutput], Tuple[List[RequestOutput], float, List[float]]]:
         """Generates the completions for the input prompts.
 
         NOTE: This class automatically batches the given prompts, considering
@@ -216,7 +218,7 @@ class LLM:
                     data=multi_modal_data.data[i].unsqueeze(0))
                 if multi_modal_data else None,
             )
-        return self._run_engine(use_tqdm)
+        return self._run_engine(use_tqdm, timing=timing)
 
     def _add_request(
         self,
@@ -234,7 +236,7 @@ class LLM:
                                     lora_request=lora_request,
                                     multi_modal_data=multi_modal_data)
 
-    def _run_engine(self, use_tqdm: bool) -> List[RequestOutput]:
+    def _run_engine(self, use_tqdm: bool, timing: bool = False) -> Union[List[RequestOutput], Tuple[List[RequestOutput], float, List[float]]]:
         # Initialize tqdm.
         if use_tqdm:
             num_requests = self.llm_engine.get_num_unfinished_requests()
@@ -243,8 +245,22 @@ class LLM:
                         dynamic_ncols=True)
         # Run the engine.
         outputs: List[RequestOutput] = []
+        prefill_time_usage = None
+        decoding_time_usages = []
         while self.llm_engine.has_unfinished_requests():
+            if timing:
+                torch.cuda.synchronize()
+                start_time = time.perf_counter()
             step_outputs = self.llm_engine.step()
+            if timing:
+                torch.cuda.synchronize()
+                end_time = time.perf_counter()
+                step_time = (end_time - start_time)*1000
+                if prefill_time_usage is None:
+                    # NOTE This method is wrong since it only measures the time usage of the fist prefill batch
+                    prefill_time_usage = step_time
+                else:
+                    decoding_time_usages.append(step_time)
             for output in step_outputs:
                 if output.finished:
                     outputs.append(output)
@@ -256,4 +272,6 @@ class LLM:
         # This is necessary because some requests may be finished earlier than
         # its previous requests.
         outputs = sorted(outputs, key=lambda x: int(x.request_id))
+        if timing:
+            return outputs, prefill_time_usage, decoding_time_usages
         return outputs
